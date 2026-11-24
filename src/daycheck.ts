@@ -60,3 +60,9 @@ export function checkEntries<E extends CheckEntry, P extends CheckPlan<E>>(plan:
   const t = g.itemId ? task(g.itemId) : undefined;
   return {plan: {...plan, top: plan.top.map(set), dump: plan.dump.map(set), blocks: plan.blocks.map(set)}, itemId: t ? g.itemId : null};
 }
+
+/** A line became a task: every plain line, priority and box with the same text points at it too. */
+export function linkText<E extends CheckEntry, P extends CheckPlan<E>>(plan: P, text: string, itemId: string, title: string): P {
+  const set = <T extends CheckEntry>(e: T): T => !e.itemId && norm(e.text) === norm(text) ? {...e, itemId, text: title} : e;
+  return {...plan, top: plan.top.map(set), dump: plan.dump.map(set), blocks: plan.blocks.map(set)};
+}

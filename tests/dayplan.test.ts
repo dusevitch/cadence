@@ -8,7 +8,7 @@ import {migrate, saveWorkspace} from '../server/auth.ts';
 import {dayPlanReminders} from '../server/dayplan.ts';
 import {createMcpServer} from '../server/mcp.ts';
 import {guarded} from '../server/tokens.ts';
-import {checkEntries, entryDone} from '../src/daycheck.ts';
+import {checkEntries, entryDone, linkText} from '../src/daycheck.ts';
 import {boxesFor, carryLines, copyBox} from '../src/dayweek.ts';
 import {personDay, rollTodayStatuses} from '../server/todaystatus.ts';
 import {addDays} from '../src/dates.ts';
@@ -315,4 +315,14 @@ test('Today status: boxing a task only changes its status when the person may ed
   saveWorkspace(t.db, {requireLogin: true});
   t.updateDayPlan(sam.id, personDay(t, sam.id), {blocks: [{id: 'v', text: '', itemId: it.id, start: '09:00', minutes: 30}]});
   assert.equal(t.item(it.id).status, 'todo', 'a viewer boxing a task does not move it');
+});
+
+test('day planner: a box made into a task ties the brain dump line and the priority with the same text to it', () => {
+  const plan = {top: [{id: 't', text: 'Call Tim'}], dump: [{id: 'd', text: ' call  tim '}, {id: 'o', text: 'Laundry'}, {id: 'k', text: 'Call Tim', itemId: 'other'}],
+    blocks: [{id: 'b', text: 'Call Tim', itemId: 'new', start: '09:00', minutes: 30}, {id: 'b2', text: 'call tim', start: '13:00', minutes: 30}]};
+  const next = linkText(plan, 'Call Tim', 'new', 'Call Tim today');
+  assert.deepEqual(next.dump, [{id: 'd', text: 'Call Tim today', itemId: 'new'}, {id: 'o', text: 'Laundry'}, {id: 'k', text: 'Call Tim', itemId: 'other'}], 'the line is the task now; other lines and lines of another task stay');
+  assert.deepEqual(next.top, [{id: 't', text: 'Call Tim today', itemId: 'new'}]);
+  assert.deepEqual(next.blocks.map(b => [b.itemId, b.start]), [['new', '09:00'], ['new', '13:00']], 'a second box with the same text follows');
+  assert.equal(plan.dump[0].text, ' call  tim ', 'the plan passed in is not changed');
 });

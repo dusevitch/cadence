@@ -39,7 +39,7 @@ const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() 
 const atOf = (date: string, start: string) => new Date(`${date}T${start}:00`).toISOString();
 import {matchScore} from './match.ts';
 import {TimeEntryEdit} from './TimeTracker.tsx';
-import {checkEntries, entryDone, type TaskInfo} from './daycheck.ts';
+import {checkEntries, entryDone, linkText, type TaskInfo} from './daycheck.ts';
 import {boxesFor, carryLines, copyBox} from './dayweek.ts';
 import {EventEditor, GCAL_COLORS, type CalEvent as FullEvent} from './Meetings.tsx';
 import {uiAlert, uiConfirm} from './dialogs.tsx';
@@ -195,12 +195,6 @@ export function DayPlanner({store, me, open}: {store: Store; me: string; open: (
 
   /** Change the newest plan (never a stale copy from before an await). */
   const update = (fn: (p: Plan) => Plan, created: string[] = []) => save(fn(latest.current!), created);
-  /** A line became a task: every line, priority and box with the same text points at it too. */
-  const linkText = (p: Plan, text: string, itemId: string, title: string): Plan => {
-    const same = (e: Entry) => !e.itemId && e.text.trim().toLowerCase() === text.trim().toLowerCase();
-    const set = <T extends Entry>(e: T): T => same(e) ? {...e, itemId, text: title} : e;
-    return {...p, top: p.top.map(set), dump: p.dump.map(set), blocks: p.blocks.map(set)};
-  };
   // Everything on this page reads the clock of the plan's time zone (saved with the day), not the computer's.
   const tz = plan.tz || browserTz();
   const today = inZone(now, tz).day, nowMin = inZone(now, tz).m;
@@ -809,7 +803,9 @@ export function DayPlanner({store, me, open}: {store: Store; me: string; open: (
       body: [b.note, ...(b.links ?? []).map(id => store.items.get(id)).filter(Boolean).map(x => `- ${itemKey(x!, store.projects)} ${x!.title}`)].filter(Boolean).join('\n')}});
   };
   const editor = eb && <BoxEditor key={eb.id} store={store} b={eb} date={date} space={space} open={open} onCalendar={() => openCalendar(eb)}
-    patch={p => patchBlock(eb.id, p)} remove={() => { removeBlock(eb.id); setEditing(null); }} close={() => setEditing(null)} />;
+    patch={p => patchBlock(eb.id, p)}
+    tie={(it, made) => update(p => linkText({...p, blocks: p.blocks.map(x => x.id === eb.id ? {...x, itemId: it.id, text: it.title, links: (x.links ?? []).filter(y => y !== it.id)} : x)}, eb.text, it.id, it.title), made ? [it.id] : [])}
+    remove={() => { removeBlock(eb.id); setEditing(null); }} close={() => setEditing(null)} />;
   const fold = (k: string, title: string, body: React.ReactNode) => <details open={isOpen(k)} onToggle={e => { const v = (e.currentTarget as HTMLDetailsElement).open; if (v !== isOpen(k)) setOpen(k, v); }}><summary>{title}</summary>{body}</details>;
 
   // Three views, same features: Focus (lists left, day right), Three columns, and Timeline across.
@@ -903,7 +899,9 @@ function askNotify() {
   try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission(); } catch { /* not supported */ }
 }
 
-function BoxEditor({store, b, date, space, open, patch, remove, close, onCalendar}: {store: Store; b: Block; date: string; space: string; open: (id: string) => void; patch: (p: Partial<Block>) => void; remove: () => void; close: () => void; onCalendar: () => void}) {
+function BoxEditor({store, b, date, space, open, patch, tie, remove, close, onCalendar}: {store: Store; b: Block; date: string; space: string; open: (id: string) => void; patch: (p: Partial<Block>) => void;
+  /** The box is this task now, and so is every line and priority with the box's text. made: the task was just created. */
+  tie: (it: Item, made?: boolean) => void; remove: () => void; close: () => void; onCalendar: () => void}) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const it = b.itemId ? store.items.get(b.itemId) : undefined;
@@ -917,7 +915,7 @@ function BoxEditor({store, b, date, space, open, patch, remove, close, onCalenda
     .map(i => ({i, score: asQ.trim().length >= 2 ? (itemKey(i, store.projects).toLowerCase() === asQ.trim().toLowerCase() ? 2 : i.title.toLowerCase().includes(asQ.trim().toLowerCase()) ? 1 : 0) : matchScore(title, i.title, itemKey(i, store.projects))}))
     .filter(x => x.score >= (asQ.trim().length >= 2 ? 1 : 0.45)).sort((x, y) => y.score - x.score).slice(0, 5).map(x => x.i);
   const useTask = (x: Item) => {
-    patch({itemId: x.id, text: x.title, links: (b.links ?? []).filter(y => y !== x.id)});
+    tie(x);
     setTitle(x.title); setAsQ('');
     const p: Partial<Item> = {};
     if (!x.assignees.includes(store.me)) p.assignees = [...x.assignees, store.me];
@@ -928,7 +926,11 @@ function BoxEditor({store, b, date, space, open, patch, remove, close, onCalenda
     const pid = realProjects(store.projects).find(p => p.id === space)?.id ?? realProjects(store.projects)[0]?.id;
     if (!pid || !title.trim()) return;
     const made = await store.quickAdd(pid, title.trim());
-    if (made) { if (!made.assignees.length) store.updateItem(made.id, {assignees: [store.me]}); patch({itemId: made.id, text: made.title}); }
+    if (!made) return;
+    if (!made.assignees.length) store.updateItem(made.id, {assignees: [store.me]});
+    // Due this day, so it shows under Assigned like a task made from a brain dump line.
+    if (!made.due) store.updateItem(made.id, {due: date});
+    tie(made, true);
   };
   return <div className="dp-editor" onMouseDown={e => e.stopPropagation()}>
     <div className="row"><b className="grow">Time box</b><button className="icon" onClick={close} title="Close"><X size={14} /></button></div>
