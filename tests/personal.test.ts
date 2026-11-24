@@ -106,7 +106,7 @@ test('rollbacks are for signed-in admins only; personal imports never touch what
   const {tasks, server, call, member, a, m} = await harness();
   try {
     const snaps = (await call('/backups', {method: 'POST', cookie: a})).json;
-    const name = snaps.file.split('/').pop();
+    const name = snaps.file.split(/[\\/]/).pop();
     assert.equal((await call('/backups/restore', {method: 'POST', body: {name}, cookie: m})).status, 403);
     assert.equal((await call('/backups/restore', {method: 'POST', body: {name: '../../etc/passwd'}, cookie: a})).status, 400);
     assert.equal((await call('/import', {method: 'POST', body: {}, cookie: m})).status, 403);

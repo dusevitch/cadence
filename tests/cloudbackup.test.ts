@@ -78,7 +78,7 @@ test('cloud copies follow the same keep rules as local ones, and a cloud copy re
     assert.equal(await uploadSnapshot('main', file, settings), true);
     const left = [...s3.objects.keys()].sort();
     assert.equal(left.length, 2, left.join());
-    assert.ok(left.some(k => k.endsWith('manual.db.enc')) && left.some(k => k.endsWith(file.split('/').pop() + '.enc')));
+    assert.ok(left.some(k => k.endsWith('manual.db.enc')) && left.some(k => k.endsWith(file.split(/[\\/]/).pop() + '.enc')));
     assert.equal(await pruneCloud('main', settings), 0);
 
     tasks.createItem({projectId: p.id, title: 'After'});
