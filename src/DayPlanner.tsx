@@ -40,7 +40,7 @@ const atOf = (date: string, start: string) => new Date(`${date}T${start}:00`).to
 import {matchScore} from './match.ts';
 import {TimeEntryEdit} from './TimeTracker.tsx';
 import {checkEntries, entryDone, linkText, type TaskInfo} from './daycheck.ts';
-import {boxesFor, carryLines, copyBox} from './dayweek.ts';
+import {boxesFor, carryLines, copyBox, emptyBox} from './dayweek.ts';
 import {EventEditor, GCAL_COLORS, type CalEvent as FullEvent} from './Meetings.tsx';
 import {uiAlert, uiConfirm} from './dialogs.tsx';
 
@@ -155,6 +155,11 @@ export function DayPlanner({store, me, open}: {store: Store; me: string; open: (
       dirty.current = false;
     }, 400);
   };
+  // A box left untitled and untouched goes away when its editor closes (or you leave the page), so empty boxes do not pile up.
+  useEffect(() => () => {
+    const p = latest.current, b = editing ? p?.blocks.find(x => x.id === editing) : undefined;
+    if (p && b && emptyBox(b)) save({...p, blocks: p.blocks.filter(x => x.id !== b.id)});
+  }, [editing]);
   // Ctrl+Z undoes the last planner change (and removes tasks it made). Falls back to the app's undo when there is none.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

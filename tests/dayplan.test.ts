@@ -9,7 +9,7 @@ import {dayPlanReminders} from '../server/dayplan.ts';
 import {createMcpServer} from '../server/mcp.ts';
 import {guarded} from '../server/tokens.ts';
 import {checkEntries, entryDone, linkText} from '../src/daycheck.ts';
-import {boxesFor, carryLines, copyBox} from '../src/dayweek.ts';
+import {boxesFor, carryLines, copyBox, emptyBox} from '../src/dayweek.ts';
 import {personDay, rollTodayStatuses} from '../server/todaystatus.ts';
 import {addDays} from '../src/dates.ts';
 
@@ -325,4 +325,12 @@ test('day planner: a box made into a task ties the brain dump line and the prior
   assert.deepEqual(next.top, [{id: 't', text: 'Call Tim today', itemId: 'new'}]);
   assert.deepEqual(next.blocks.map(b => [b.itemId, b.start]), [['new', '09:00'], ['new', '13:00']], 'a second box with the same text follows');
   assert.equal(plan.dump[0].text, ' call  tim ', 'the plan passed in is not changed');
+});
+
+test('day planner: a box left untitled and untouched counts as empty; anything filled in keeps it', () => {
+  const b = {id: 'b', text: '', start: '09:00', minutes: 30, remind: false};
+  assert.equal(emptyBox(b), true);
+  assert.equal(emptyBox({...b, text: '   ', note: ' ', links: [], color: null, eventId: null}), true, 'blanks are still empty');
+  for (const filled of [{text: 'Lunch'}, {itemId: 'i1'}, {note: 'agenda'}, {links: ['i2']}, {eventId: 'e1'}, {color: '3'}, {remind: true}])
+    assert.equal(emptyBox({...b, ...filled}), false, JSON.stringify(filled));
 });

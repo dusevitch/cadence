@@ -4,6 +4,9 @@ import {entryDone, type CheckEntry, type CheckPlan, type TaskInfo} from './daych
 type Box = CheckEntry & {start: string; minutes: number; remind?: boolean; remindBefore?: number; notified?: boolean; eventId?: string | null;
   planned?: {start: string; minutes: number} | null; fitted?: boolean; color?: string | null; note?: string; links?: string[]; at?: string | null};
 
+/** A box nobody filled in: no title, task, note, tied tasks, calendar event, color or reminder. */
+export const emptyBox = (b: Box) => !b.text.trim() && !b.itemId && !b.note?.trim() && !b.links?.length && !b.eventId && !b.color && !b.remind;
+
 /** A box copied to another day: same title, task, length, color, note and tied tasks; not done, not on the calendar, not fitted. */
 export function copyBox<B extends Box>(b: B, newId: () => string, start = b.start): Box {
   const {id: _i, done: _d, notified: _n, eventId: _e, planned: _p, fitted: _f, at: _a, ...rest} = b;
